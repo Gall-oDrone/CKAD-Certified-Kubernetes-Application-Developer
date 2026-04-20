@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Creates a code-server IDE for Microservices Trading Bot with EKS development environment
+Description: Creates a code-server IDE for CKAD Certified Kubernetes Application Developer with EKS development environment
 Parameters:
   InstanceVolumeSize:
     Type: Number
@@ -12,7 +12,7 @@ Parameters:
   RepositoryName:
     Type: String
     Description: The name of the GitHub repository to be used to bootstrap the IDE
-    Default: "microservices-trading-bot"
+    Default: "CKAD-Certified-Kubernetes-Application-Developer"
   RepositoryRef:
     Type: String
     Description: The Git reference to be used to bootstrap the IDE
@@ -42,7 +42,7 @@ Parameters:
   EksClusterId:
     Type: String
     Description: Project ID for resource tagging
-    Default: "microservices-trading-bot"
+    Default: "CKAD-Certified-Kubernetes-Application-Developer"
   InstanceProfileName:
     Type: String
     Description: Name of the IAM instance profile to attach to the IDE EC2 instance
@@ -447,7 +447,7 @@ Resources:
       DocumentFormat: YAML
       Content:
         schemaVersion: "2.2"
-        description: Bootstrap Trading Bot IDE Instance
+        description: Bootstrap CKAD IDE Instance
         mainSteps:
           - action: aws:runShellScript
             name: TradingBotIdeBootstrap
@@ -458,7 +458,7 @@ Resources:
                   #!/bin/bash
                   set -e
                   
-                  LOG_FILE="/var/log/trading-bot-bootstrap.log"
+                  LOG_FILE="/var/log/ckad-bootstrap.log"
                   mkdir -p "$(dirname "$LOG_FILE")"
                   touch "$LOG_FILE"
                   chmod 600 "$LOG_FILE"
@@ -925,7 +925,7 @@ Resources:
       IamInstanceProfile: !Ref InstanceProfileName
       Tags:
         - Key: type
-          Value: trading-bot-ide
+          Value: ckad-ide
         - Key: Name
           Value: !Sub ${AWS::StackName}-instance
       UserData:

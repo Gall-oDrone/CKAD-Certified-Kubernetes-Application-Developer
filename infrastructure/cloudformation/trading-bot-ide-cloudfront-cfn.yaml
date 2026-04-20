@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: CloudFront distribution for the Trading Bot IDE environment.
+Description: CloudFront distribution for the CKAD IDE environment.
 
 Parameters:
   ParentStackName:
     Type: String
-    Description: Name of the base Trading Bot IDE stack
+    Description: Name of the base CKAD IDE stack
   InstancePublicDnsName:
     Type: String
     Description: Public DNS name of the IDE EC2 instance (without protocol)
@@ -49,7 +49,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: !Sub Trading Bot IDE distribution for ${ParentStackName}
+        Comment: !Sub CKAD IDE distribution for ${ParentStackName}
         Enabled: true
         HttpVersion: http2and3
         PriceClass: !Ref PriceClass

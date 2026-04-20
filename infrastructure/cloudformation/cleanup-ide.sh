@@ -1,5 +1,5 @@
 #!/bin/bash
-# Delete Trading Bot IDE CloudFormation stacks in the correct order
+# Delete CKAD IDE CloudFormation stacks in the correct order
 
 set -e
 
@@ -13,9 +13,9 @@ NC='\033[0m' # No Color
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STACK_NAME="trading-bot-ide"
-IAM_STACK_NAME="trading-bot-ide-iam"
-CLOUDFRONT_STACK_NAME="trading-bot-ide-cloudfront"
+STACK_NAME="ckad-ide"
+IAM_STACK_NAME="ckad-ide-iam"
+CLOUDFRONT_STACK_NAME="ckad-ide-cloudfront"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 MAX_WAIT_TIME=3600   # Maximum wait time in seconds (60 minutes)
 POLL_INTERVAL=30     # Poll interval in seconds
@@ -270,7 +270,7 @@ main() {
     parse_args "$@"
 
     log_info "=========================================="
-    log_info "Trading Bot IDE Cleanup Script"
+    log_info "CKAD IDE Cleanup Script"
     log_info "=========================================="
     log_info "Log file: $LOG_FILE"
     echo ""

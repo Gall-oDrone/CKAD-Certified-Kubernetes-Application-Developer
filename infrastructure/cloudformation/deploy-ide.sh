@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy and monitor Trading Bot IDE CloudFormation stack
+# Deploy and monitor CKAD IDE CloudFormation stack
 # This script creates the stack, monitors its progress, and retrieves the IDE password upon completion
 
 set -e
@@ -15,11 +15,11 @@ NC='\033[0m' # No Color
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-cfn.yaml"
-STACK_NAME="trading-bot-ide"
+STACK_NAME="ckad-ide"
 IAM_TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-iam-cfn.yaml"
-IAM_STACK_NAME="trading-bot-ide-iam"
+IAM_STACK_NAME="ckad-ide-iam"
 CLOUDFRONT_TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-cloudfront-cfn.yaml"
-CLOUDFRONT_STACK_NAME="trading-bot-ide-cloudfront"
+CLOUDFRONT_STACK_NAME="ckad-ide-cloudfront"
 CLOUDFRONT_PRICE_CLASS="${CLOUDFRONT_PRICE_CLASS:-PriceClass_All}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 MAX_WAIT_TIME=3600  # Maximum wait time in seconds (60 minutes)
@@ -29,10 +29,10 @@ INSTANCE_PROFILE_NAME=""
 
 # Parameters
 REPOSITORY_OWNER="${REPOSITORY_OWNER:-Gall-oDrone}"
-REPOSITORY_NAME="${REPOSITORY_NAME:-microservices-trading-bot}"
+REPOSITORY_NAME="${REPOSITORY_NAME:-CKAD-Certified-Kubernetes-Application-Developer}"
 REPOSITORY_REF="${REPOSITORY_REF:-main}"
 INSTANCE_VOLUME_SIZE="${INSTANCE_VOLUME_SIZE:-50}"
-EKS_CLUSTER_ID="${EKS_CLUSTER_ID:-microservices-trading-bot}"
+EKS_CLUSTER_ID="${EKS_CLUSTER_ID:-ckad-certified-kubernetes-application-developer}"
 
 # Logging functions
 log() {
@@ -239,7 +239,7 @@ upload_template_to_s3() {
     
     local aws_account=$(aws sts get-caller-identity --query 'Account' --output text)
     local bucket_name="cfn-templates-${aws_account}-${AWS_REGION}"
-    local template_key="trading-bot-ide/${stack_name}-$(date +%Y%m%d-%H%M%S).yaml"
+    local template_key="ckad-ide/${stack_name}-$(date +%Y%m%d-%H%M%S).yaml"
     
     # Check if bucket exists, create if it doesn't
     if ! aws s3 ls "s3://${bucket_name}" &>/dev/null; then
@@ -558,7 +558,7 @@ retrieve_password() {
 # Main execution
 main() {
     log_info "=========================================="
-    log_info "Trading Bot IDE Deployment Script"
+    log_info "CKAD IDE Deployment Script"
     log_info "=========================================="
     log_info "Log file: $LOG_FILE"
     echo ""

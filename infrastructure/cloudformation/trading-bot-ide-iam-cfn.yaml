@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: IAM resources (role and instance profile) for the Trading Bot IDE environment.
+Description: IAM resources (role and instance profile) for the CKAD IDE environment.
 
 Parameters:
   ParentStackName:
