@@ -62,15 +62,15 @@ EOF
 
 # Each QUESTION line is: domain|question|solution|verify
 # Solutions often contain '|' (pipes), so we must NOT use IFS='|' read with only 4 fields.
+# (Question must not include literal '|' characters. Verify is always the last segment after '|'.)
 parse_quiz_line() {
   local line="$1"
-  local -n _domain="$2" _question="$3" _solution="$4" _verify="$5"
-  _verify="${line##*|}"
+  Q_PARSED_VERIFY="${line##*|}"
   local without_verify="${line%|*}"
-  _domain="${without_verify%%|*}"
+  Q_PARSED_DOMAIN="${without_verify%%|*}"
   local rest="${without_verify#*|}"
-  _question="${rest%%|*}"
-  _solution="${rest#*|}"
+  Q_PARSED_QUESTION="${rest%%|*}"
+  Q_PARSED_SOLUTION="${rest#*|}"
 }
 
 # Parse arguments
@@ -96,7 +96,7 @@ QUESTIONS=(
   "security|Create a ServiceAccount named 'quiz-sa' in namespace 'quiz'.|kubectl create serviceaccount quiz-sa -n quiz|kubectl get serviceaccount quiz-sa -n quiz -o jsonpath='{.metadata.name}'"
   "design|Create a Job named 'quiz-job' using image busybox that runs 'echo CKAD' in namespace 'quiz'.|kubectl create job quiz-job --image=busybox -n quiz -- echo CKAD|kubectl get job quiz-job -n quiz -o jsonpath='{.metadata.name}'"
   "design|Create a CronJob named 'quiz-cron' with schedule '*/5 * * * *' using image busybox that runs 'date' in namespace 'quiz'.|kubectl create cronjob quiz-cron --image=busybox --schedule='*/5 * * * *' -n quiz -- date|kubectl get cronjob quiz-cron -n quiz -o jsonpath='{.spec.schedule}'"
-  "security|Create a Role named 'quiz-role' in namespace 'quiz' that allows get,list on pods.|kubectl create role quiz-role --verb=get,list --resource=pods -n quiz|kubectl get role quiz-role -n quiz -o jsonpath='{.metadata.name}'"
+  "security|Create a Role named 'quiz-role' in namespace 'quiz' that allows get,list on pods.|kubectl create role quiz-role --verb=get,list --resource=pods -n quiz|kubectl get role quiz-role -n quiz -o name"
   "deploy|Scale the deployment 'quiz-deploy' to 5 replicas in namespace 'quiz'.|kubectl scale deployment quiz-deploy --replicas=5 -n quiz|kubectl get deployment quiz-deploy -n quiz -o jsonpath='{.spec.replicas}'"
   "deploy|Set the image of deployment 'quiz-deploy' to nginx:latest in namespace 'quiz'.|kubectl set image deployment/quiz-deploy nginx=nginx:latest -n quiz|kubectl get deployment quiz-deploy -n quiz -o jsonpath='{.spec.template.spec.containers[0].image}'"
   "networking|Create a ClusterIP Service named 'quiz-svc' targeting quiz-deploy on port 80 in namespace 'quiz'.|kubectl expose deployment quiz-deploy --name=quiz-svc --port=80 -n quiz|kubectl get service quiz-svc -n quiz -o jsonpath='{.spec.type}'"
@@ -187,15 +187,23 @@ if [ -f "$HISTORY_FILE" ]; then
   fi
 fi
 
-# Ensure quiz namespace exists
-kubectl create namespace quiz --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null
+# Ensure quiz namespace exists (do not hide errors: verify needs a working 'quiz' namespace)
+if ! kubectl get namespace quiz &>/dev/null; then
+  if ! kubectl create namespace quiz; then
+    echo -e "${RED}Cannot create namespace 'quiz' — is your cluster reachable and is kubectl configured?${NC}" >&2
+    exit 1
+  fi
+fi
 
 # Shuffle questions
 shuffled=($(shuf -i 0-$((${#FILTERED_QUESTIONS[@]}-1)) -n ${#FILTERED_QUESTIONS[@]} 2>/dev/null || seq 0 $((${#FILTERED_QUESTIONS[@]}-1))))
 
 for idx in "${shuffled[@]}"; do
-  domain="" question="" solution="" verify=""
-  parse_quiz_line "${FILTERED_QUESTIONS[$idx]}" domain question solution verify
+  parse_quiz_line "${FILTERED_QUESTIONS[$idx]}"
+  domain="$Q_PARSED_DOMAIN"
+  question="$Q_PARSED_QUESTION"
+  solution="$Q_PARSED_SOLUTION"
+  verify="$Q_PARSED_VERIFY"
   total=$((total + 1))
 
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -221,18 +229,22 @@ for idx in "${shuffled[@]}"; do
     echo -e "  Completed in ${elapsed}s"
   fi
 
-  # Verify (run once; solution may contain '|' so verify must be the exact last field)
-  verify_out=""
-  if verify_out=$(eval "$verify" 2>/dev/null); then
-    if [[ -n "$verify_out" ]]; then
-      echo -e "  ${GREEN}✓ CORRECT — Resource verified successfully${NC}"
-      score=$((score + 1))
-    else
-      echo -e "  ${RED}✗ NOT FOUND — Resource not created correctly${NC}"
-      echo -e "  Expected solution: ${GREEN}${solution}${NC}"
-    fi
+  # Verify: must succeed with exit 0. Under set -e, use explicit status capture.
+  set +e
+  verify_combined_out=$(eval "$verify" 2>&1)
+  verify_status=$?
+  set -e
+  if [ "$verify_status" -eq 0 ]; then
+    echo -e "  ${GREEN}✓ CORRECT — Resource verified successfully${NC}"
+    score=$((score + 1))
   else
     echo -e "  ${RED}✗ VERIFICATION FAILED${NC}"
+    if [ -n "$verify_combined_out" ]; then
+      echo -e "  ${DIM}From kubectl:${NC}"
+      while IFS= read -r _kl || [ -n "$_kl" ]; do
+        echo -e "  ${DIM}  ${_kl}${NC}"
+      done <<< "$verify_combined_out"
+    fi
     echo -e "  Expected solution: ${GREEN}${solution}${NC}"
   fi
   echo ""
