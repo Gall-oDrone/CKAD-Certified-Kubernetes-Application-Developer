@@ -27,6 +27,52 @@ HISTORY_FILE="${HOME}/.ckad-quiz-history"
 SPEED_MODE=false
 DOMAIN_FILTER=""
 
+# YAML helpers (heredocs cannot live inside the pipe-delimited QUESTIONS strings)
+apply_quiz_networkpolicy() {
+  kubectl apply -f - <<'EOF'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quiz-netpol
+  namespace: quiz
+spec:
+  podSelector:
+    matchLabels:
+      app: quiz-pod
+  policyTypes:
+  - Ingress
+EOF
+}
+
+apply_quiz_pvc() {
+  kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quiz-pvc
+  namespace: quiz
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+EOF
+}
+
+# Each QUESTION line is: domain|question|solution|verify
+# Solutions often contain '|' (pipes), so we must NOT use IFS='|' read with only 4 fields.
+parse_quiz_line() {
+  local line="$1"
+  local -n _domain="$2" _question="$3" _solution="$4" _verify="$5"
+  _verify="${line##*|}"
+  local without_verify="${line%|*}"
+  _domain="${without_verify%%|*}"
+  local rest="${without_verify#*|}"
+  _question="${rest%%|*}"
+  _solution="${rest#*|}"
+}
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,12 +98,12 @@ QUESTIONS=(
   "design|Create a CronJob named 'quiz-cron' with schedule '*/5 * * * *' using image busybox that runs 'date' in namespace 'quiz'.|kubectl create cronjob quiz-cron --image=busybox --schedule='*/5 * * * *' -n quiz -- date|kubectl get cronjob quiz-cron -n quiz -o jsonpath='{.spec.schedule}'"
   "security|Create a Role named 'quiz-role' in namespace 'quiz' that allows get,list on pods.|kubectl create role quiz-role --verb=get,list --resource=pods -n quiz|kubectl get role quiz-role -n quiz -o jsonpath='{.metadata.name}'"
   "deploy|Scale the deployment 'quiz-deploy' to 5 replicas in namespace 'quiz'.|kubectl scale deployment quiz-deploy --replicas=5 -n quiz|kubectl get deployment quiz-deploy -n quiz -o jsonpath='{.spec.replicas}'"
-  "deploy|Set the image of deployment 'quiz-deploy' to nginx:latest in namespace 'quiz'.|kubectl set image deployment/quiz-deploy nginx-alpine=nginx:latest -n quiz || kubectl set image deployment/quiz-deploy nginx=nginx:latest -n quiz|kubectl get deployment quiz-deploy -n quiz -o jsonpath='{.spec.template.spec.containers[0].image}'"
+  "deploy|Set the image of deployment 'quiz-deploy' to nginx:latest in namespace 'quiz'.|kubectl set image deployment/quiz-deploy nginx=nginx:latest -n quiz|kubectl get deployment quiz-deploy -n quiz -o jsonpath='{.spec.template.spec.containers[0].image}'"
   "networking|Create a ClusterIP Service named 'quiz-svc' targeting quiz-deploy on port 80 in namespace 'quiz'.|kubectl expose deployment quiz-deploy --name=quiz-svc --port=80 -n quiz|kubectl get service quiz-svc -n quiz -o jsonpath='{.spec.type}'"
   "security|Create a RoleBinding 'quiz-binding' binding 'quiz-role' to ServiceAccount 'quiz-sa' in namespace 'quiz'.|kubectl create rolebinding quiz-binding --role=quiz-role --serviceaccount=quiz:quiz-sa -n quiz|kubectl get rolebinding quiz-binding -n quiz -o jsonpath='{.metadata.name}'"
   "observe|Get the logs of pod 'quiz-pod' in namespace 'quiz' (just run the command).|kubectl logs quiz-pod -n quiz|kubectl get pod quiz-pod -n quiz -o jsonpath='{.metadata.name}'"
-  "networking|Create a NetworkPolicy 'quiz-netpol' in namespace 'quiz' that denies all ingress to pods labeled app=quiz-pod.|kubectl apply -f - <<'EOF'\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: quiz-netpol\n  namespace: quiz\nspec:\n  podSelector:\n    matchLabels:\n      app: quiz-pod\n  policyTypes:\n  - Ingress\nEOF|kubectl get networkpolicy quiz-netpol -n quiz -o jsonpath='{.metadata.name}'"
-  "design|Create a PVC named 'quiz-pvc' requesting 100Mi with ReadWriteOnce in namespace 'quiz'.|kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: quiz-pvc\n  namespace: quiz\nspec:\n  accessModes:\n  - ReadWriteOnce\n  resources:\n    requests:\n      storage: 100Mi\nEOF|kubectl get pvc quiz-pvc -n quiz -o jsonpath='{.metadata.name}'"
+  "networking|Create a NetworkPolicy 'quiz-netpol' in namespace 'quiz' that denies all ingress to pods labeled app=quiz-pod.|apply_quiz_networkpolicy|kubectl get networkpolicy quiz-netpol -n quiz -o jsonpath='{.metadata.name}'"
+  "design|Create a PVC named 'quiz-pvc' requesting 100Mi with ReadWriteOnce in namespace 'quiz'.|apply_quiz_pvc|kubectl get pvc quiz-pvc -n quiz -o jsonpath='{.metadata.name}'"
 )
 
 score=0
@@ -148,7 +194,8 @@ kubectl create namespace quiz --dry-run=client -o yaml | kubectl apply -f - 2>/d
 shuffled=($(shuf -i 0-$((${#FILTERED_QUESTIONS[@]}-1)) -n ${#FILTERED_QUESTIONS[@]} 2>/dev/null || seq 0 $((${#FILTERED_QUESTIONS[@]}-1))))
 
 for idx in "${shuffled[@]}"; do
-  IFS='|' read -r domain question solution verify <<< "${FILTERED_QUESTIONS[$idx]}"
+  domain="" question="" solution="" verify=""
+  parse_quiz_line "${FILTERED_QUESTIONS[$idx]}" domain question solution verify
   total=$((total + 1))
 
   echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -174,10 +221,10 @@ for idx in "${shuffled[@]}"; do
     echo -e "  Completed in ${elapsed}s"
   fi
 
-  # Verify
-  if eval "$verify" &>/dev/null; then
-    result=$(eval "$verify" 2>/dev/null)
-    if [ -n "$result" ]; then
+  # Verify (run once; solution may contain '|' so verify must be the exact last field)
+  verify_out=""
+  if verify_out=$(eval "$verify" 2>/dev/null); then
+    if [[ -n "$verify_out" ]]; then
       echo -e "  ${GREEN}✓ CORRECT — Resource verified successfully${NC}"
       score=$((score + 1))
     else
