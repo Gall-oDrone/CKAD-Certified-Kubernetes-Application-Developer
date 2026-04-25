@@ -14,6 +14,9 @@
 # Source: https://github.com/techwithmohamed/CKAD-Certified-Kubernetes-Application-Developer
 
 set -euo pipefail
+# Pasted one-liners may use the exam alias `k`; non-interactive shells do not expand aliases by default
+shopt -s expand_aliases
+alias k=kubectl
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -176,6 +179,10 @@ echo -e "${BOLD}║       CKAD Quick Quiz — Practice Mode         ║${NC}"
 echo -e "${BOLD}║  ${#FILTERED_QUESTIONS[@]} questions | ${mode_label} | domain: ${domain_label}    ${NC}"
 echo -e "${BOLD}╚═══════════════════════════════════════════════╝${NC}"
 echo ""
+echo -e "${DIM}This prompt only waits for Enter: it does not read commands from other terminals.${NC}"
+echo -e "${DIM}• Use a second tab: run kubectl there, then return here and press ${BOLD}Enter${DIM} (empty line) to verify.${NC}"
+echo -e "${DIM}• Or paste a single ${BOLD}kubectl ...${DIM} or ${BOLD}k ...${DIM} line at the prompt; it will be run here before verify.${NC}"
+echo ""
 
 # Show recent history if available
 if [ -f "$HISTORY_FILE" ]; then
@@ -214,12 +221,31 @@ for idx in "${shuffled[@]}"; do
 
   start_time=$(date +%s)
   read -r user_input
+  # Strip Windows CRLF so pasted one-liners match kubectl/k patterns
+  user_input="${user_input//$'\r'/}"
 
   if [ "$user_input" = "skip" ]; then
     echo -e "${RED}Skipped.${NC}"
     echo -e "  Solution: ${GREEN}${solution}${NC}"
     echo ""
     continue
+  fi
+
+  # A plain `read` does NOT run what you type: many users paste the expected kubectl line here.
+  # If it looks like a one-line kubectl/k command, run it in this shell before we verify.
+  if [[ -n "$user_input" ]]; then
+    if [[ "$user_input" =~ ^[[:space:]]*kubectl[[:space:]] ]] || [[ "$user_input" =~ ^[[:space:]]*k[[:space:]]+ ]]; then
+      echo -e "  ${DIM}Running: ${BOLD}${user_input}${NC}"
+      set +e
+      eval "$user_input"
+      user_cmd_ec=$?
+      set -e
+      if [ "$user_cmd_ec" -ne 0 ]; then
+        echo -e "  ${YELLOW}That command exited with status ${user_cmd_ec}.${NC}"
+      fi
+    else
+      echo -e "  ${YELLOW}Not running the line you typed (not kubectl/k). Open another tab to run your commands, or paste a one-line kubectl or k command.${NC}"
+    fi
   fi
 
   elapsed=$(( $(date +%s) - start_time ))
