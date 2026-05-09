@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Creates a code-server IDE for CKAD Certified Kubernetes Application Developer with EKS development environment
+Description: Creates a code-server IDE for Certified Kubernetes certification labs (CKAD primary workspace and optional CKA companion repo) with EKS development environment
 Parameters:
   InstanceVolumeSize:
     Type: Number
@@ -16,6 +16,18 @@ Parameters:
   RepositoryRef:
     Type: String
     Description: The Git reference to be used to bootstrap the IDE
+    Default: "main"
+  SecondaryRepositoryOwner:
+    Type: String
+    Description: GitHub owner for the secondary certification repository cloned alongside the primary repo (leave SecondaryRepositoryName empty to skip)
+    Default: "Gall-oDrone"
+  SecondaryRepositoryName:
+    Type: String
+    Description: GitHub repository name for CKA material (empty string skips cloning the secondary repo)
+    Default: "CKA-Certified-Kubernetes-Administrator"
+  SecondaryRepositoryRef:
+    Type: String
+    Description: Git reference for the secondary repository
     Default: "main"
   ResourcesPrecreated:
     Type: String
@@ -447,7 +459,7 @@ Resources:
       DocumentFormat: YAML
       Content:
         schemaVersion: "2.2"
-        description: Bootstrap CKAD IDE Instance
+        description: Bootstrap Certified Kubernetes IDE instance
         mainSteps:
           - action: aws:runShellScript
             name: TradingBotIdeBootstrap
@@ -773,6 +785,9 @@ Resources:
                   export REPOSITORY_OWNER="${RepositoryOwner}"
                   export REPOSITORY_NAME="${RepositoryName}"
                   export REPOSITORY_REF="${RepositoryRef}"
+                  export SECONDARY_REPOSITORY_OWNER="${SecondaryRepositoryOwner}"
+                  export SECONDARY_REPOSITORY_NAME="${SecondaryRepositoryName}"
+                  export SECONDARY_REPOSITORY_REF="${SecondaryRepositoryRef}"
                   export RESOURCES_PRECREATED="${ResourcesPrecreated}"
                   export ANALYTICS_ENDPOINT="${AnalyticsEndpoint}"
                   export GITHUB_TOKEN_SECRET_NAME="${GitHubTokenSecretName}"
@@ -864,12 +879,16 @@ Resources:
                   bind-addr: 127.0.0.1:8889
                   EOF
 
-                  # Clone repository in user environment
-                  echo "Cloning Microservices Trading Bot repository..."
+                  # Clone certification repositories in user environment
+                  echo "Cloning Certified Kubernetes training repositories..."
                   cd ~/environment
                   if [ ! -d "${RepositoryName}" ]; then
-                      git clone https://github.com/${RepositoryOwner}/${RepositoryName}.git || error_exit $LINENO
-                      echo "Repository cloned successfully!"
+                      git clone -b "${RepositoryRef}" https://github.com/${RepositoryOwner}/${RepositoryName}.git || error_exit $LINENO
+                      echo "Primary repository (${RepositoryName}) cloned successfully!"
+                  fi
+                  if [ -n "${SecondaryRepositoryName}" ] && [ ! -d "${SecondaryRepositoryName}" ]; then
+                      git clone -b "${SecondaryRepositoryRef}" https://github.com/${SecondaryRepositoryOwner}/${SecondaryRepositoryName}.git || error_exit $LINENO
+                      echo "Secondary repository (${SecondaryRepositoryName}) cloned successfully!"
                   fi
 
                   # Authenticate GitHub CLI and enable push when token secret is provided

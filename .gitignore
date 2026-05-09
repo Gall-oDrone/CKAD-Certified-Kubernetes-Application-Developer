@@ -13,3 +13,6 @@ Desktop.ini
 # Temp
 *.tmp
 *.bak
+
+# CloudFormation deploy logs (local)
+infrastructure/cloudformation/logs/*.log

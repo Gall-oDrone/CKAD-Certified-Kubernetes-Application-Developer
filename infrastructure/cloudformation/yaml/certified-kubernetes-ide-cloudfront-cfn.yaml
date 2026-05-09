@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: CloudFront distribution for the CKAD IDE environment.
+Description: CloudFront distribution for the Certified Kubernetes IDE (CKAD/CKA lab) environment.
 
 Parameters:
   ParentStackName:
@@ -49,7 +49,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: !Sub CKAD IDE distribution for ${ParentStackName}
+        Comment: !Sub Certified Kubernetes IDE distribution for ${ParentStackName}
         Enabled: true
         HttpVersion: http2and3
         PriceClass: !Ref PriceClass

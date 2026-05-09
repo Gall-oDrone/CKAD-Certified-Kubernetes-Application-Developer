@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy and monitor CKAD IDE CloudFormation stack
+# Deploy and monitor Certified Kubernetes IDE CloudFormation stack (CKAD primary + optional CKA repo)
 # This script creates the stack, monitors its progress, and retrieves the IDE password upon completion
 
 set -e
@@ -14,23 +14,28 @@ NC='\033[0m' # No Color
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-cfn.yaml"
+CFN_YAML_DIR="${SCRIPT_DIR}/../yaml"
+TEMPLATE_FILE="${CFN_YAML_DIR}/certified-kubernetes-ide-cfn.yaml"
 STACK_NAME="ckad-ide"
-IAM_TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-iam-cfn.yaml"
+IAM_TEMPLATE_FILE="${CFN_YAML_DIR}/certified-kubernetes-ide-iam-cfn.yaml"
 IAM_STACK_NAME="ckad-ide-iam"
-CLOUDFRONT_TEMPLATE_FILE="${SCRIPT_DIR}/trading-bot-ide-cloudfront-cfn.yaml"
+CLOUDFRONT_TEMPLATE_FILE="${CFN_YAML_DIR}/certified-kubernetes-ide-cloudfront-cfn.yaml"
 CLOUDFRONT_STACK_NAME="ckad-ide-cloudfront"
 CLOUDFRONT_PRICE_CLASS="${CLOUDFRONT_PRICE_CLASS:-PriceClass_All}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 MAX_WAIT_TIME=3600  # Maximum wait time in seconds (60 minutes)
 POLL_INTERVAL=30    # Poll interval in seconds
-LOG_FILE="${SCRIPT_DIR}/deploy-ide.log"
+LOG_FILE="${SCRIPT_DIR}/../logs/deploy-ide.log"
+mkdir -p "$(dirname "$LOG_FILE")"
 INSTANCE_PROFILE_NAME=""
 
 # Parameters
 REPOSITORY_OWNER="${REPOSITORY_OWNER:-Gall-oDrone}"
 REPOSITORY_NAME="${REPOSITORY_NAME:-CKAD-Certified-Kubernetes-Application-Developer}"
 REPOSITORY_REF="${REPOSITORY_REF:-main}"
+SECONDARY_REPOSITORY_OWNER="${SECONDARY_REPOSITORY_OWNER:-${REPOSITORY_OWNER}}"
+SECONDARY_REPOSITORY_NAME="${SECONDARY_REPOSITORY_NAME:-CKA-Certified-Kubernetes-Administrator}"
+SECONDARY_REPOSITORY_REF="${SECONDARY_REPOSITORY_REF:-main}"
 INSTANCE_VOLUME_SIZE="${INSTANCE_VOLUME_SIZE:-50}"
 EKS_CLUSTER_ID="${EKS_CLUSTER_ID:-ckad-certified-kubernetes-application-developer}"
 
@@ -274,6 +279,9 @@ create_stack() {
     log_info "  RepositoryOwner: $REPOSITORY_OWNER"
     log_info "  RepositoryName: $REPOSITORY_NAME"
     log_info "  RepositoryRef: $REPOSITORY_REF"
+    log_info "  SecondaryRepositoryOwner: $SECONDARY_REPOSITORY_OWNER"
+    log_info "  SecondaryRepositoryName: $SECONDARY_REPOSITORY_NAME"
+    log_info "  SecondaryRepositoryRef: $SECONDARY_REPOSITORY_REF"
     log_info "  InstanceVolumeSize: $INSTANCE_VOLUME_SIZE GB"
     log_info "  EksClusterId: $EKS_CLUSTER_ID"
     log_info "  InstanceProfileName: $INSTANCE_PROFILE_NAME"
@@ -291,6 +299,9 @@ create_stack() {
             "ParameterKey=RepositoryOwner,ParameterValue=$REPOSITORY_OWNER" \
             "ParameterKey=RepositoryName,ParameterValue=$REPOSITORY_NAME" \
             "ParameterKey=RepositoryRef,ParameterValue=$REPOSITORY_REF" \
+            "ParameterKey=SecondaryRepositoryOwner,ParameterValue=$SECONDARY_REPOSITORY_OWNER" \
+            "ParameterKey=SecondaryRepositoryName,ParameterValue=$SECONDARY_REPOSITORY_NAME" \
+            "ParameterKey=SecondaryRepositoryRef,ParameterValue=$SECONDARY_REPOSITORY_REF" \
             "ParameterKey=InstanceVolumeSize,ParameterValue=$INSTANCE_VOLUME_SIZE" \
             "ParameterKey=EksClusterId,ParameterValue=$EKS_CLUSTER_ID" \
             "ParameterKey=InstanceProfileName,ParameterValue=$INSTANCE_PROFILE_NAME" \
@@ -330,6 +341,9 @@ update_stack() {
             "ParameterKey=RepositoryOwner,ParameterValue=$REPOSITORY_OWNER" \
             "ParameterKey=RepositoryName,ParameterValue=$REPOSITORY_NAME" \
             "ParameterKey=RepositoryRef,ParameterValue=$REPOSITORY_REF" \
+            "ParameterKey=SecondaryRepositoryOwner,ParameterValue=$SECONDARY_REPOSITORY_OWNER" \
+            "ParameterKey=SecondaryRepositoryName,ParameterValue=$SECONDARY_REPOSITORY_NAME" \
+            "ParameterKey=SecondaryRepositoryRef,ParameterValue=$SECONDARY_REPOSITORY_REF" \
             "ParameterKey=InstanceVolumeSize,ParameterValue=$INSTANCE_VOLUME_SIZE" \
             "ParameterKey=EksClusterId,ParameterValue=$EKS_CLUSTER_ID" \
             "ParameterKey=InstanceProfileName,ParameterValue=$INSTANCE_PROFILE_NAME" \
@@ -461,7 +475,6 @@ deploy_cloudfront_stack() {
 # Get stack outputs
 get_stack_outputs() {
     local stack_name=${1:-$STACK_NAME}
-    log_info "Retrieving outputs for stack '$stack_name'..."
     
     aws cloudformation describe-stacks \
         --stack-name "$stack_name" \
@@ -558,7 +571,7 @@ retrieve_password() {
 # Main execution
 main() {
     log_info "=========================================="
-    log_info "CKAD IDE Deployment Script"
+    log_info "Certified Kubernetes IDE deployment script"
     log_info "=========================================="
     log_info "Log file: $LOG_FILE"
     echo ""

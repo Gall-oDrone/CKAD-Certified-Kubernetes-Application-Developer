@@ -19,7 +19,8 @@ CLOUDFRONT_STACK_NAME="ckad-ide-cloudfront"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 MAX_WAIT_TIME=3600   # Maximum wait time in seconds (60 minutes)
 POLL_INTERVAL=30     # Poll interval in seconds
-LOG_FILE="${SCRIPT_DIR}/cleanup-ide.log"
+LOG_FILE="${SCRIPT_DIR}/../logs/cleanup-ide.log"
+mkdir -p "$(dirname "$LOG_FILE")"
 FORCE_DELETE=0
 
 # Logging helpers
